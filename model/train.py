@@ -79,6 +79,18 @@ def lora_targets(model, config):
     return [n for n, m in model.named_modules() if isinstance(m, torch.nn.Linear)]
 
 
+def _target_token_ids(tokenizer, texts, max_len):
+    spm = tokenizer.tgt_spm
+    encoder = tokenizer.tgt_encoder
+    unk = tokenizer.unk_token_id
+    eos = encoder.get(tokenizer.eos_token, tokenizer.eos_token_id)
+    ids = []
+    for text in texts:
+        pieces = spm.EncodeAsPieces(text)[: max_len - 1]
+        ids.append([encoder.get(p, unk) for p in pieces] + [eos])
+    return ids
+
+
 def load_datasets(config, tokenizer):
     source_column = config.get("source_column", "english_text")
     target_column = config.get("target_column", "kashmiri_text")
@@ -123,11 +135,7 @@ def load_datasets(config, tokenizer):
                 chunk_src, max_length=max_src, truncation=True, padding=False
             )
             if model_type == "indic2":
-                tokenizer._switch_to_target_mode()
-                tgt = tokenizer(
-                    chunk_tgt, max_length=max_tgt, truncation=True, padding=False
-                )
-                tokenizer._switch_to_input_mode()
+                chunk_labels = _target_token_ids(tokenizer, chunk_tgt, max_tgt)
             else:
                 tgt = tokenizer(
                     text_target=chunk_tgt,
@@ -135,9 +143,10 @@ def load_datasets(config, tokenizer):
                     truncation=True,
                     padding=False,
                 )
+                chunk_labels = tgt["input_ids"]
             input_ids.extend(inputs["input_ids"])
             attention.extend(inputs["attention_mask"])
-            labels.extend(tgt["input_ids"])
+            labels.extend(chunk_labels)
         return {"input_ids": input_ids, "attention_mask": attention, "labels": labels}
 
     def build(csv_path, cache_path):
