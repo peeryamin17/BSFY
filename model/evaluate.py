@@ -36,6 +36,7 @@ def main():
     parser.add_argument("--config", default=str(ROOT / "model" / "config.yaml"))
     parser.add_argument("--data", default="data/val.csv")
     parser.add_argument("--out", default="outputs/predictions/val_predictions.csv")
+    parser.add_argument("--max-samples", type=int, default=2000)
     args = parser.parse_args()
 
     config = load_config(args.config)
@@ -43,6 +44,8 @@ def main():
     target_column = config.get("target_column", "kashmiri_text")
 
     df = pd.read_csv(ROOT / args.data)
+    if args.max_samples and len(df) > args.max_samples:
+        df = df.head(args.max_samples)
     texts = df[source_column].astype(str).tolist()
     references = df[target_column].astype(str).tolist()
     print(f"Evaluating on {len(df):,} sentences ...")

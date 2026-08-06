@@ -220,11 +220,18 @@ def mbr_rerank(candidates, metric="chrf"):
 
 
 def predict(texts, config, checkpoints, batch_size=None):
-    checkpoints = checkpoints or [None]
-
     if not config.get("mbr", False):
-        model, tokenizer = load_model_and_tokenizer(config, checkpoints[0])
+        checkpoint = None
+        if checkpoints:
+            root = Path(checkpoints[0]).parent
+            if (root / "adapter_config.json").exists():
+                checkpoint = str(root)
+            else:
+                checkpoint = checkpoints[0]
+        model, tokenizer = load_model_and_tokenizer(config, checkpoint)
         return generate_predictions(model, tokenizer, texts, config, batch_size)
+
+    checkpoints = checkpoints or [None]
 
     n_best = config.get("mbr_n_best", 8)
     pooled = [[] for _ in texts]

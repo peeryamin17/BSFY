@@ -263,8 +263,6 @@ def main():
         logging_steps=config.get("logging_steps", 100),
         logging_first_step=True,
         predict_with_generate=config.get("predict_with_generate", True),
-        generation_max_length=config.get("max_generate_tokens", 128),
-        generation_num_beams=config.get("num_beams", 8),
         fp16=config.get("fp16", True) and torch.cuda.is_available(),
         gradient_checkpointing=config.get("gradient_checkpointing", False),
         optim=config.get("optim", "adamw_torch"),

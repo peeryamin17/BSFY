@@ -50,7 +50,7 @@ num_beams: 8
 length_penalty: 0.6
 no_repeat_ngram_size: 3
 max_generate_tokens: 128
-batch_size: 32
-mbr: true
+batch_size: 16
+mbr: false
 mbr_n_best: 8
 mbr_metric: "chrf"
