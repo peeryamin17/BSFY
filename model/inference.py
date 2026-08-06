@@ -1,14 +1,3 @@
-"""Generate English -> Kashmiri translations with a fine-tuned model.
-
-Shared helpers used by both model/inference.py and model/evaluate.py.
-
-Usage (make a Kaggle submission from test.csv):
-    python model/inference.py \
-        --checkpoint outputs/models/nllb-baseline \
-        --config model/config.yaml \
-        --test data/test.csv \
-        --out outputs/submission.csv
-"""
 import argparse
 from pathlib import Path
 
@@ -20,37 +9,47 @@ from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def load_config(path: str) -> dict:
-    with open(path, "r", encoding="utf-8") as f:
+def load_config(path):
+    with open(path, encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
-def load_model_and_tokenizer(config: dict, checkpoint: str | None = None):
-    """Load a fine-tuned checkpoint, falling back to the pretrained model."""
-    if checkpoint and (Path(checkpoint) / "config.json").exists():
-        tokenizer = AutoTokenizer.from_pretrained(checkpoint)
-        model = AutoModelForSeq2SeqLM.from_pretrained(checkpoint)
+def _load_base(config):
+    model_type = config.get("model_type", "nllb")
+    model_name = config["model_name"]
+    tgt_lang = config.get("tgt_lang", "")
+
+    if model_type in ("nllb", "mbart"):
+        tokenizer = AutoTokenizer.from_pretrained(model_name, tgt_lang=tgt_lang)
+        model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+        if tgt_lang:
+            model.config.forced_bos_token_id = tokenizer.convert_tokens_to_ids(tgt_lang)
+    elif model_type == "indic2":
+        tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+        model = AutoModelForSeq2SeqLM.from_pretrained(model_name, trust_remote_code=True)
     else:
-        model_name = config["model_name"]
-        model_type = config.get("model_type", "nllb")
-        tgt_lang = config.get("tgt_lang", "")
-        if model_type in ("nllb", "mbart"):
-            tokenizer = AutoTokenizer.from_pretrained(model_name, tgt_lang=tgt_lang)
-            model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
-        elif model_type == "indic2":
-            tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
-            model = AutoModelForSeq2SeqLM.from_pretrained(model_name, trust_remote_code=True)
-        else:
-            raise ValueError(f"Unknown model_type: {model_type}")
+        raise ValueError(f"Unknown model_type: {model_type}")
     return model, tokenizer
 
 
-def _setup_language(config: dict, tokenizer, model) -> int | None:
-    """Configure source/target languages for generation.
+def load_model_and_tokenizer(config, checkpoint=None):
+    if checkpoint and (Path(checkpoint) / "adapter_config.json").exists():
+        from peft import PeftModel
 
-    Returns the forced_bos_token_id (target language id) for NLLB/mBART, or
-    None for IndicTrans2 (which uses the source prefix tag instead).
-    """
+        tokenizer = AutoTokenizer.from_pretrained(checkpoint)
+        base_model, _ = _load_base(config)
+        model = PeftModel.from_pretrained(base_model, checkpoint)
+        if config.get("merge_lora", True):
+            model = model.merge_and_unload()
+    elif checkpoint and (Path(checkpoint) / "config.json").exists():
+        tokenizer = AutoTokenizer.from_pretrained(checkpoint)
+        model = AutoModelForSeq2SeqLM.from_pretrained(checkpoint)
+    else:
+        model, tokenizer = _load_base(config)
+    return model, tokenizer
+
+
+def _setup_language(config, tokenizer, model):
     model_type = config.get("model_type", "nllb")
     src_lang = config.get("src_lang", "")
     tgt_lang = config.get("tgt_lang", "")
@@ -64,17 +63,18 @@ def _setup_language(config: dict, tokenizer, model) -> int | None:
     return None
 
 
-def _prefix_source(texts: list[str], config: dict) -> list[str]:
+def _prefix_source(texts, config):
     prefix = config.get("source_prefix", "") or ""
     return [prefix + t for t in texts] if prefix else texts
 
 
 @torch.no_grad()
-def generate_predictions(
-    model, tokenizer, texts: list[str], config: dict, batch_size: int = 32
-) -> list[str]:
-    """Translate a list of English sentences to Kashmiri."""
-    device = model.device
+def generate_predictions(model, tokenizer, texts, config, batch_size=None):
+    if batch_size is None:
+        batch_size = config.get("batch_size", 32)
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = model.to(device)
     forced_bos = _setup_language(config, tokenizer, model)
     sources = _prefix_source(texts, config)
 
@@ -99,31 +99,23 @@ def generate_predictions(
             return_tensors="pt",
         ).to(device)
         outputs = model.generate(**inputs, **gen_kwargs)
-        preds = tokenizer.batch_decode(outputs, skip_special_tokens=True)
-        all_preds.extend(preds)
+        all_preds.extend(tokenizer.batch_decode(outputs, skip_special_tokens=True))
 
     return all_preds
 
 
-def translate(
-    texts: list[str],
-    checkpoint: str | None = None,
-    config_path: str | None = None,
-) -> list[str]:
-    """Convenience wrapper for notebooks / scripts."""
+def translate(texts, checkpoint=None, config_path=None):
     config = load_config(config_path or str(ROOT / "model" / "config.yaml"))
     model, tokenizer = load_model_and_tokenizer(config, checkpoint)
     return generate_predictions(model, tokenizer, texts, config)
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate EN->KS predictions")
-    parser.add_argument("--checkpoint", default=None, help="Fine-tuned model dir")
-    parser.add_argument(
-        "--config", default=str(ROOT / "model" / "config.yaml"), help="YAML config"
-    )
-    parser.add_argument("--test", default="data/test.csv", help="Test CSV with English text")
-    parser.add_argument("--out", default="outputs/submission.csv", help="Output CSV")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--checkpoint", default=None)
+    parser.add_argument("--config", default=str(ROOT / "model" / "config.yaml"))
+    parser.add_argument("--test", default="data/test.csv")
+    parser.add_argument("--out", default="outputs/submission.csv")
     args = parser.parse_args()
 
     config = load_config(args.config)

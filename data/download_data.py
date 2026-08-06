@@ -1,12 +1,3 @@
-"""Download the BPCC Kashmiri parallel corpus (en <-> kas_Arab) from HuggingFace.
-
-The BPCC dataset is gated, so you must be logged in to HuggingFace first:
-
-    huggingface-cli login
-
-Usage:
-    python data/download_data.py [--out data/raw] [--force]
-"""
 import argparse
 from pathlib import Path
 
@@ -17,13 +8,9 @@ KAS_FILE = "bpcc-seed-latest/kas_Arab.tsv"
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Download BPCC Kashmiri corpus")
-    parser.add_argument(
-        "--out", default="data/raw", help="Output directory for the downloaded file"
-    )
-    parser.add_argument(
-        "--force", action="store_true", help="Re-download even if the file exists"
-    )
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--out", default="data/raw")
+    parser.add_argument("--force", action="store_true")
     args = parser.parse_args()
 
     out_dir = Path(args.out)

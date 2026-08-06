@@ -1,24 +1,6 @@
-"""Evaluate a fine-tuned model with chrF++ and BLEU (geometric mean).
-
-Loads a checkpoint, translates the held-out split, and reports:
-
-    chrF++     - character-level fluency
-    BLEU       - n-gram precision
-    geo_mean   - sqrt(chrF++ * BLEU)  <- the competition metric
-
-The predictions are also saved to disk so they can be inspected.
-
-Usage:
-    python model/evaluate.py \
-        --checkpoint outputs/models/nllb-baseline \
-        --config model/config.yaml \
-        --data data/val.csv
-"""
 import argparse
-from pathlib import Path
 
 import pandas as pd
-import yaml
 from sacrebleu import CHRF, BLEU
 
 from inference import (
@@ -29,13 +11,12 @@ from inference import (
 )
 
 
-def compute_metrics(predictions: list[str], references: list[str]) -> dict:
-    """chrF++ and BLEU + geometric mean for corpus-level scoring."""
+def compute_metrics(predictions, references):
     if len(predictions) != len(references):
         raise ValueError("Predictions and references must have the same length")
 
     refs = [[ref] for ref in references]
-    chrf = CHRF(word_order=2)  # chrF++
+    chrf = CHRF(word_order=2)
     bleu = BLEU()
 
     chrf_score = chrf.corpus_score(predictions, refs).score
@@ -50,17 +31,11 @@ def compute_metrics(predictions: list[str], references: list[str]) -> dict:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Evaluate EN->KS model")
-    parser.add_argument("--checkpoint", required=True, help="Fine-tuned model dir")
-    parser.add_argument(
-        "--config", default=str(ROOT / "model" / "config.yaml"), help="YAML config"
-    )
-    parser.add_argument(
-        "--data", default="data/val.csv", help="CSV with english_text + kashmiri_text"
-    )
-    parser.add_argument(
-        "--out", default="outputs/predictions/val_predictions.csv", help="Save predictions"
-    )
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--checkpoint", required=True)
+    parser.add_argument("--config", default=str(ROOT / "model" / "config.yaml"))
+    parser.add_argument("--data", default="data/val.csv")
+    parser.add_argument("--out", default="outputs/predictions/val_predictions.csv")
     args = parser.parse_args()
 
     config = load_config(args.config)

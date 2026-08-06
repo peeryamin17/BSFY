@@ -10,8 +10,11 @@ scored on the **geometric mean of chrF++ and BLEU**.
 ## Model
 
 - **Base**: NLLB-200 distilled 600M (fast, works on an 8GB GPU). Swap in
-  `ai4bharat/IndicTrans2-en-indic-1B` via `model/config.yaml` for the best
+  `ai4bharat/indictrans2-en-indic-1B` via `model/config.yaml` for the best
   Kashmiri coverage if you have more VRAM.
+- **Method**: LoRA fine-tuning with cached, parallel tokenization and
+  gradient checkpointing — trainable parameters are a small fraction of the
+  base model, so it fits comfortably on an 8GB GPU.
 - **Fine-tuned on**: BPCC Kashmiri subset
   (`ai4bharat/BPCC` · `bpcc-seed-latest/kas_Arab.tsv`, ~28 MB).
 - **Metric**: `geo_mean = sqrt(chrF++ × BLEU)`.
