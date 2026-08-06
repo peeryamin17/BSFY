@@ -65,6 +65,9 @@ def load_tokenizer_and_model(config):
             target_modules=targets,
         )
         model = get_peft_model(model, lora_config)
+        model.print_trainable_parameters()
+        if config.get("gradient_checkpointing", False):
+            model.get_base_model().enable_input_require_grads()
 
     return tokenizer, model
 
