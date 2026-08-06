@@ -199,6 +199,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default=str(ROOT / "model" / "config.yaml"))
     parser.add_argument("--resume", default=None)
+    parser.add_argument("--max-steps", type=int, default=None)
     args = parser.parse_args()
 
     config = load_config(args.config)
@@ -231,6 +232,7 @@ def main():
         per_device_eval_batch_size=config.get("per_device_eval_batch_size", 8),
         gradient_accumulation_steps=config.get("gradient_accumulation_steps", 1),
         num_train_epochs=config.get("num_train_epochs", 3),
+        max_steps=args.max_steps,
         weight_decay=config.get("weight_decay", 0.01),
         warmup_steps=config.get("warmup_steps", 500),
         logging_steps=config.get("logging_steps", 100),
