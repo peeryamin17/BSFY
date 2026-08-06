@@ -1,9 +1,11 @@
 import argparse
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import torch
 import yaml
+from sacrebleu import CHRF, BLEU
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -51,6 +53,21 @@ def load_model_and_tokenizer(config, checkpoint=None):
     return model, tokenizer
 
 
+def collect_checkpoints(checkpoint):
+    path = Path(checkpoint)
+    if not path.exists():
+        return []
+    subdirs = sorted(
+        (p for p in path.iterdir() if p.is_dir() and p.name.startswith("checkpoint-")),
+        key=lambda p: int(p.name.rsplit("-", 1)[-1]),
+    )
+    if subdirs:
+        return [str(p) for p in subdirs]
+    if (path / "config.json").exists():
+        return [str(path)]
+    return []
+
+
 def _setup_language(config, tokenizer, model):
     model_type = config.get("model_type", "nllb")
     src_lang = config.get("src_lang", "")
@@ -70,6 +87,18 @@ def _prefix_source(texts, config):
     return [prefix + t for t in texts] if prefix else texts
 
 
+def _gen_kwargs(config, n_best=1):
+    kwargs = {
+        "max_new_tokens": config.get("max_generate_tokens", 128),
+        "num_beams": config.get("num_beams", 8),
+        "length_penalty": config.get("length_penalty", 1.0),
+        "early_stopping": True,
+    }
+    if n_best > 1:
+        kwargs["num_return_sequences"] = n_best
+    return kwargs
+
+
 @torch.no_grad()
 def generate_predictions(model, tokenizer, texts, config, batch_size=None):
     if batch_size is None:
@@ -82,12 +111,7 @@ def generate_predictions(model, tokenizer, texts, config, batch_size=None):
 
     model.eval()
     all_preds = []
-    gen_kwargs = {
-        "max_new_tokens": config.get("max_generate_tokens", 128),
-        "num_beams": config.get("num_beams", 4),
-        "length_penalty": config.get("length_penalty", 0.6),
-        "early_stopping": True,
-    }
+    gen_kwargs = _gen_kwargs(config)
     if forced_bos is not None:
         gen_kwargs["forced_bos_token_id"] = forced_bos
 
@@ -106,10 +130,84 @@ def generate_predictions(model, tokenizer, texts, config, batch_size=None):
     return all_preds
 
 
+@torch.no_grad()
+def generate_candidates(model, tokenizer, texts, config, n_best=8, batch_size=None):
+    if batch_size is None:
+        batch_size = config.get("batch_size", 32)
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = model.to(device)
+    forced_bos = _setup_language(config, tokenizer, model)
+    sources = _prefix_source(texts, config)
+
+    model.eval()
+    all_candidates = []
+    gen_kwargs = _gen_kwargs(config, n_best=n_best)
+    if forced_bos is not None:
+        gen_kwargs["forced_bos_token_id"] = forced_bos
+
+    for i in range(0, len(sources), batch_size):
+        batch = sources[i : i + batch_size]
+        inputs = tokenizer(
+            batch,
+            max_length=config.get("max_source_length", 128),
+            truncation=True,
+            padding=True,
+            return_tensors="pt",
+        ).to(device)
+        outputs = model.generate(**inputs, **gen_kwargs)
+        batch_len = outputs.shape[0] // n_best
+        outputs = outputs.view(batch_len, n_best, -1)
+        for row in outputs:
+            cands = tokenizer.batch_decode(row, skip_special_tokens=True)
+            all_candidates.append(cands)
+
+    return all_candidates
+
+
+def mbr_rerank(candidates, metric="chrf"):
+    candidates = list(dict.fromkeys(candidates))
+    if len(candidates) < 2:
+        return candidates[0]
+
+    if metric == "bleu":
+        scorer = BLEU()
+    else:
+        scorer = CHRF(word_order=2)
+
+    scores = []
+    for hyp in candidates:
+        refs = [r for r in candidates if r != hyp]
+        utility = np.mean([scorer.sentence_score(hyp, [r]).score for r in refs])
+        scores.append(utility)
+    return candidates[int(np.argmax(scores))]
+
+
+def predict(texts, config, checkpoints, batch_size=None):
+    checkpoints = checkpoints or [None]
+
+    if not config.get("mbr", False):
+        model, tokenizer = load_model_and_tokenizer(config, checkpoints[0])
+        return generate_predictions(model, tokenizer, texts, config, batch_size)
+
+    n_best = config.get("mbr_n_best", 8)
+    pooled = [[] for _ in texts]
+    for ckpt in checkpoints:
+        model, tokenizer = load_model_and_tokenizer(config, ckpt)
+        candidates = generate_candidates(model, tokenizer, texts, config, n_best, batch_size)
+        for i, cands in enumerate(candidates):
+            pooled[i].extend(cands)
+        del model, tokenizer
+        torch.cuda.empty_cache()
+
+    metric = config.get("mbr_metric", "chrf")
+    return [mbr_rerank(cands, metric) for cands in pooled]
+
+
 def translate(texts, checkpoint=None, config_path=None):
     config = load_config(config_path or str(ROOT / "model" / "config.yaml"))
-    model, tokenizer = load_model_and_tokenizer(config, checkpoint)
-    return generate_predictions(model, tokenizer, texts, config)
+    checkpoints = collect_checkpoints(checkpoint) if checkpoint else []
+    return predict(texts, config, checkpoints)
 
 
 def main():
@@ -128,8 +226,11 @@ def main():
     texts = test_df[source_column].astype(str).tolist()
     print(f"Translating {len(texts):,} sentences ...")
 
-    model, tokenizer = load_model_and_tokenizer(config, args.checkpoint)
-    predictions = generate_predictions(model, tokenizer, texts, config)
+    checkpoints = collect_checkpoints(args.checkpoint) if args.checkpoint else []
+    if checkpoints:
+        print(f"Using {len(checkpoints)} checkpoint(s): {[Path(c).name for c in checkpoints]}")
+
+    predictions = predict(texts, config, checkpoints)
 
     out_df = pd.DataFrame({id_col: test_df[id_col], "kashmiri_text": predictions})
     out_path = ROOT / args.out

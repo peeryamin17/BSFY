@@ -5,9 +5,9 @@ from sacrebleu import CHRF, BLEU
 
 from inference import (
     ROOT,
-    generate_predictions,
+    collect_checkpoints,
     load_config,
-    load_model_and_tokenizer,
+    predict,
 )
 
 
@@ -47,8 +47,11 @@ def main():
     references = df[target_column].astype(str).tolist()
     print(f"Evaluating on {len(df):,} sentences ...")
 
-    model, tokenizer = load_model_and_tokenizer(config, args.checkpoint)
-    predictions = generate_predictions(model, tokenizer, texts, config)
+    checkpoints = collect_checkpoints(args.checkpoint)
+    if checkpoints:
+        print(f"Using {len(checkpoints)} checkpoint(s): {[c.rsplit('/', 1)[-1] for c in checkpoints]}")
+
+    predictions = predict(texts, config, checkpoints)
 
     metrics = compute_metrics(predictions, references)
     print(f"\nchrF++   : {metrics['chrF++']}")

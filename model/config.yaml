@@ -3,7 +3,7 @@ model_type: "indic2"
 src_lang: "eng_Latn"
 tgt_lang: "kas_Arab"
 source_prefix: "<2kas_Arab> "
-output_dir: "outputs/models/indic2-baseline"
+output_dir: "outputs/models/indic2-final"
 
 data_dir: "data"
 train_file: "data/train.csv"
@@ -17,15 +17,15 @@ max_target_length: 128
 
 per_device_train_batch_size: 8
 per_device_eval_batch_size: 8
-gradient_accumulation_steps: 1
-learning_rate: 3e-5
+gradient_accumulation_steps: 2
+learning_rate: 2e-4
 warmup_steps: 500
 num_train_epochs: 3
 weight_decay: 0.01
 logging_steps: 100
 eval_steps: 500
 save_steps: 500
-save_total_limit: 3
+save_total_limit: 5
 gradient_checkpointing: true
 optim: "adamw_torch"
 fp16: true
@@ -37,13 +37,16 @@ dataloader_num_workers: 2
 torch_compile: false
 
 use_lora: true
-lora_r: 16
-lora_alpha: 32
+lora_r: 32
+lora_alpha: 64
 lora_dropout: 0.05
-lora_target_modules: ["q_proj", "v_proj"]
+lora_target_modules: ["qkv_proj", "out_proj", "q_proj", "v_proj", "k_proj", "fc1", "fc2"]
 merge_lora: true
 
-num_beams: 4
-length_penalty: 0.6
+num_beams: 8
+length_penalty: 1.0
 max_generate_tokens: 128
 batch_size: 32
+mbr: true
+mbr_n_best: 8
+mbr_metric: "chrf"

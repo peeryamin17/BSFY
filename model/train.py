@@ -56,16 +56,27 @@ def load_tokenizer_and_model(config):
     if config.get("use_lora", False):
         from peft import LoraConfig, TaskType, get_peft_model
 
+        targets = lora_targets(model, config)
         lora_config = LoraConfig(
             task_type=TaskType.SEQ_2_SEQ_LM,
             r=config.get("lora_r", 16),
             lora_alpha=config.get("lora_alpha", 32),
             lora_dropout=config.get("lora_dropout", 0.05),
-            target_modules=config.get("lora_target_modules", ["q_proj", "v_proj"]),
+            target_modules=targets,
         )
         model = get_peft_model(model, lora_config)
 
     return tokenizer, model
+
+
+def lora_targets(model, config):
+    keywords = config.get("lora_target_modules") or []
+    all_names = [n for n, _ in model.named_modules()]
+    if keywords:
+        found = [n for n in all_names if any(k in n for k in keywords)]
+        if found:
+            return found
+    return [n for n, m in model.named_modules() if isinstance(m, torch.nn.Linear)]
 
 
 def load_datasets(config, tokenizer):
