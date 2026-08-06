@@ -9,9 +9,8 @@ scored on the **geometric mean of chrF++ and BLEU**.
 
 ## Model
 
-- **Base**: NLLB-200 distilled 600M (fast, works on an 8GB GPU). Swap in
-  `ai4bharat/indictrans2-en-indic-1B` via `model/config.yaml` for the best
-  Kashmiri coverage if you have more VRAM.
+- **Base**: `ai4bharat/indictrans2-en-indic-1B` — IndicTrans2 gives the best
+  Kashmiri coverage among pretrained models.
 - **Method**: LoRA fine-tuning with cached, parallel tokenization and
   gradient checkpointing — trainable parameters are a small fraction of the
   base model, so it fits comfortably on an 8GB GPU.
@@ -31,7 +30,8 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-> The BPCC dataset is gated on HuggingFace, so log in once first:
+> The BPCC dataset and IndicTrans2 weights are gated on HuggingFace, so log in
+> once and accept the dataset/model terms first:
 >
 > ```bash
 > huggingface-cli login

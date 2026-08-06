@@ -27,6 +27,8 @@ def _load_base(config):
     elif model_type == "indic2":
         tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
         model = AutoModelForSeq2SeqLM.from_pretrained(model_name, trust_remote_code=True)
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token or tokenizer.unk_token
     else:
         raise ValueError(f"Unknown model_type: {model_type}")
     return model, tokenizer

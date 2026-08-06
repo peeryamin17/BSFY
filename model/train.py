@@ -46,6 +46,8 @@ def load_tokenizer_and_model(config):
     elif model_type == "indic2":
         tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
         model = AutoModelForSeq2SeqLM.from_pretrained(model_name, trust_remote_code=True)
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token or tokenizer.unk_token
     else:
         raise ValueError(f"Unknown model_type: {model_type}")
 
@@ -73,6 +75,7 @@ def load_datasets(config, tokenizer):
     max_src = config.get("max_source_length", 128)
     max_tgt = config.get("max_target_length", 128)
     num_proc = config.get("num_proc", 4)
+    model_type = config.get("model_type", "nllb")
     cache_dir = ROOT / config.get("cache_dir", "outputs/cache")
 
     def tokenize(examples):
@@ -80,12 +83,20 @@ def load_datasets(config, tokenizer):
         inputs = tokenizer(
             sources, max_length=max_src, truncation=True, padding=False
         )
-        targets = tokenizer(
-            text_target=examples[target_column],
-            max_length=max_tgt,
-            truncation=True,
-            padding=False,
-        )
+        if model_type == "indic2":
+            targets = tokenizer(
+                examples[target_column],
+                max_length=max_tgt,
+                truncation=True,
+                padding=False,
+            )
+        else:
+            targets = tokenizer(
+                text_target=examples[target_column],
+                max_length=max_tgt,
+                truncation=True,
+                padding=False,
+            )
         inputs["labels"] = targets["input_ids"]
         return inputs
 

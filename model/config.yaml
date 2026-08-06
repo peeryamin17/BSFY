@@ -1,9 +1,9 @@
-model_name: "facebook/nllb-200-distilled-600M"
-model_type: "nllb"
+model_name: "ai4bharat/indictrans2-en-indic-1B"
+model_type: "indic2"
 src_lang: "eng_Latn"
 tgt_lang: "kas_Arab"
-source_prefix: ""
-output_dir: "outputs/models/nllb-baseline"
+source_prefix: "<2kas_Arab> "
+output_dir: "outputs/models/indic2-baseline"
 
 data_dir: "data"
 train_file: "data/train.csv"
