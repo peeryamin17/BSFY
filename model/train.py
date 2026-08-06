@@ -11,6 +11,12 @@ import numpy as np
 import pandas as pd
 import torch
 import yaml
+
+_orig_torch_load = torch.load
+def _torch_load(*args, **kwargs):
+    kwargs.setdefault("weights_only", False)
+    return _orig_torch_load(*args, **kwargs)
+torch.load = _torch_load
 from datasets import Dataset, load_from_disk
 from sacrebleu import CHRF, BLEU
 from transformers import (
