@@ -18,9 +18,13 @@ def main():
     parser.add_argument("--data", default="data/val.csv")
     parser.add_argument("--out", default="outputs/predictions/val_predictions.csv")
     parser.add_argument("--max-samples", type=int, default=2000)
+    parser.add_argument("--mbr", dest="mbr", action="store_true")
+    parser.add_argument("--no-mbr", dest="mbr", action="store_false")
     args = parser.parse_args()
 
     config = load_config(args.config)
+    if args.mbr is not None:
+        config["mbr"] = args.mbr
     source_column = config.get("source_column", "english_text")
     target_column = config.get("target_column", "kashmiri_text")
 

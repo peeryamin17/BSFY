@@ -96,16 +96,23 @@ def _prefix_source(texts, config):
 
 
 def _gen_kwargs(config, n_best=1):
-    kwargs = {
+    if n_best > 1:
+        return {
+            "max_new_tokens": config.get("max_generate_tokens", 128),
+            "do_sample": True,
+            "top_p": config.get("top_p", 0.9),
+            "temperature": config.get("temperature", 0.7),
+            "num_return_sequences": n_best,
+            "num_beams": 1,
+            "no_repeat_ngram_size": config.get("no_repeat_ngram_size", 3),
+        }
+    return {
         "max_new_tokens": config.get("max_generate_tokens", 128),
         "num_beams": config.get("num_beams", 8),
         "length_penalty": config.get("length_penalty", 0.6),
         "early_stopping": True,
         "no_repeat_ngram_size": config.get("no_repeat_ngram_size", 3),
     }
-    if n_best > 1:
-        kwargs["num_return_sequences"] = n_best
-    return kwargs
 
 
 def _get_processor(config):
@@ -251,6 +258,7 @@ def predict(texts, config, checkpoints, batch_size=None):
             del model, tokenizer
             torch.cuda.empty_cache()
 
+        pooled = [[normalize(c) for c in cands] for cands in pooled]
         metric = config.get("mbr_metric", "chrf")
         results = [mbr_rerank(cands, metric) for cands in pooled]
     return [normalize(p) for p in results]
@@ -268,9 +276,13 @@ def main():
     parser.add_argument("--config", default=str(ROOT / "model" / "config.yaml"))
     parser.add_argument("--test", default="data/test.csv")
     parser.add_argument("--out", default="outputs/submission.csv")
+    parser.add_argument("--mbr", dest="mbr", action="store_true")
+    parser.add_argument("--no-mbr", dest="mbr", action="store_false")
     args = parser.parse_args()
 
     config = load_config(args.config)
+    if args.mbr is not None:
+        config["mbr"] = args.mbr
     test_df = pd.read_csv(ROOT / args.test)
     source_column = config.get("source_column", "english_text")
 
