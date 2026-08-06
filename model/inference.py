@@ -213,20 +213,25 @@ def generate_candidates(model, tokenizer, texts, config, n_best=8, batch_size=No
     return all_candidates
 
 
-def mbr_rerank(candidates, metric="chrf"):
+def mbr_rerank(candidates, metric="geo"):
     candidates = list(dict.fromkeys(candidates))
     if len(candidates) < 2:
         return candidates[0]
 
-    if metric == "bleu":
-        scorer = BLEU()
-    else:
-        scorer = CHRF(word_order=2)
+    chrf_scorer = CHRF(word_order=2)
+    bleu_scorer = BLEU() if metric in ("bleu", "geo") else None
 
     scores = []
     for hyp in candidates:
         refs = [r for r in candidates if r != hyp]
-        utility = np.mean([scorer.sentence_score(hyp, [r]).score for r in refs])
+        chrf = np.mean([chrf_scorer.sentence_score(hyp, [r]).score for r in refs])
+        if metric == "geo":
+            bleu = np.mean([bleu_scorer.sentence_score(hyp, [r]).score for r in refs])
+            utility = (chrf * bleu) ** 0.5
+        elif metric == "bleu":
+            utility = np.mean([bleu_scorer.sentence_score(hyp, [r]).score for r in refs])
+        else:
+            utility = chrf
         scores.append(utility)
     return candidates[int(np.argmax(scores))]
 
@@ -278,11 +283,14 @@ def main():
     parser.add_argument("--out", default="outputs/submission.csv")
     parser.add_argument("--mbr", dest="mbr", action="store_true")
     parser.add_argument("--no-mbr", dest="mbr", action="store_false")
+    parser.add_argument("--mbr-metric", default=None, choices=["chrf", "bleu", "geo"])
     args = parser.parse_args()
 
     config = load_config(args.config)
     if args.mbr is not None:
         config["mbr"] = args.mbr
+    if args.mbr_metric:
+        config["mbr_metric"] = args.mbr_metric
     test_df = pd.read_csv(ROOT / args.test)
     source_column = config.get("source_column", "english_text")
 

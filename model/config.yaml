@@ -53,7 +53,7 @@ max_generate_tokens: 128
 batch_size: 16
 mbr: false
 mbr_n_best: 8
-mbr_metric: "chrf"
+mbr_metric: "geo"
 mbr_max_checkpoints: 3
 top_p: 0.9
 temperature: 0.7
