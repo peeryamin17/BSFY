@@ -22,13 +22,17 @@ def main():
         return
 
     print(f"Downloading {REPO_ID} :: {KAS_FILE} ...")
-    local_path = hf_hub_download(
-        repo_id=REPO_ID,
-        filename=KAS_FILE,
-        repo_type="dataset",
-        local_dir=out_dir,
+    local_path = Path(
+        hf_hub_download(
+            repo_id=REPO_ID,
+            filename=KAS_FILE,
+            repo_type="dataset",
+            local_dir=out_dir,
+        )
     )
-    print(f"Downloaded to {local_path}")
+    if local_path != dest:
+        local_path.rename(dest)
+    print(f"Downloaded to {dest}")
 
 
 if __name__ == "__main__":
