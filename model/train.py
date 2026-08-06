@@ -87,7 +87,6 @@ def load_datasets(config, tokenizer):
     max_tgt = config.get("max_target_length", 128)
     model_type = config.get("model_type", "nllb")
     cache_dir = ROOT / config.get("cache_dir", "outputs/cache")
-    num_proc = config.get("num_proc", 4)
 
     processor = None
     if model_type == "indic2" and config.get("use_indic_processor", False):
@@ -101,42 +100,45 @@ def load_datasets(config, tokenizer):
     src_lang = config.get("src_lang", "")
     tgt_lang = config.get("tgt_lang", "")
 
-    if model_type == "indic2":
-        num_proc = 1
+    def tokenize_df(df):
+        sources_raw = df[source_column].astype(str).tolist()
+        targets_raw = df[target_column].astype(str).tolist()
 
-    def tokenize(examples):
         if processor is not None:
             sources = processor.preprocess_batch(
-                examples[source_column], src_lang=src_lang, tgt_lang=tgt_lang
+                sources_raw, src_lang=src_lang, tgt_lang=tgt_lang
             )
-            raw_targets = processor.preprocess_batch(
-                examples[target_column],
-                src_lang=src_lang,
-                tgt_lang=tgt_lang,
-                is_target=True,
+            targets = processor.preprocess_batch(
+                targets_raw, src_lang=src_lang, tgt_lang=tgt_lang, is_target=True
             )
         else:
-            sources = [source_prefix + s for s in examples[source_column]]
-            raw_targets = examples[target_column]
+            sources = [source_prefix + s for s in sources_raw]
+            targets = targets_raw
 
-        inputs = tokenizer(
-            sources, max_length=max_src, truncation=True, padding=False
-        )
-        if model_type == "indic2":
-            tokenizer._switch_to_target_mode()
-            targets = tokenizer(
-                raw_targets, max_length=max_tgt, truncation=True, padding=False
+        input_ids, attention, labels = [], [], []
+        for i in range(0, len(sources), 1000):
+            chunk_src = sources[i : i + 1000]
+            chunk_tgt = targets[i : i + 1000]
+            inputs = tokenizer(
+                chunk_src, max_length=max_src, truncation=True, padding=False
             )
-            tokenizer._switch_to_input_mode()
-        else:
-            targets = tokenizer(
-                text_target=raw_targets,
-                max_length=max_tgt,
-                truncation=True,
-                padding=False,
-            )
-        inputs["labels"] = targets["input_ids"]
-        return inputs
+            if model_type == "indic2":
+                tokenizer._switch_to_target_mode()
+                tgt = tokenizer(
+                    chunk_tgt, max_length=max_tgt, truncation=True, padding=False
+                )
+                tokenizer._switch_to_input_mode()
+            else:
+                tgt = tokenizer(
+                    text_target=chunk_tgt,
+                    max_length=max_tgt,
+                    truncation=True,
+                    padding=False,
+                )
+            input_ids.extend(inputs["input_ids"])
+            attention.extend(inputs["attention_mask"])
+            labels.extend(tgt["input_ids"])
+        return {"input_ids": input_ids, "attention_mask": attention, "labels": labels}
 
     def build(csv_path, cache_path):
         if cache_path.exists():
@@ -144,13 +146,7 @@ def load_datasets(config, tokenizer):
             return load_from_disk(str(cache_path))
         df = pd.read_csv(ROOT / csv_path)
         print(f"Loaded {len(df):,} pairs from {csv_path}")
-        dataset = Dataset.from_pandas(df)
-        dataset = dataset.map(
-            tokenize,
-            batched=True,
-            num_proc=num_proc,
-            remove_columns=[source_column, target_column],
-        )
+        dataset = Dataset.from_dict(tokenize_df(df))
         dataset.save_to_disk(str(cache_path))
         return dataset
 
