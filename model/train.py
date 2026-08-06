@@ -85,25 +85,52 @@ def load_datasets(config, tokenizer):
     source_prefix = config.get("source_prefix", "") or ""
     max_src = config.get("max_source_length", 128)
     max_tgt = config.get("max_target_length", 128)
-    num_proc = config.get("num_proc", 4)
     model_type = config.get("model_type", "nllb")
     cache_dir = ROOT / config.get("cache_dir", "outputs/cache")
+    num_proc = config.get("num_proc", 4)
+
+    processor = None
+    if model_type == "indic2" and config.get("use_indic_processor", False):
+        try:
+            from IndicTransToolkit.processor import IndicProcessor
+
+            processor = IndicProcessor(inference=False)
+        except ImportError:
+            processor = None
+
+    src_lang = config.get("src_lang", "")
+    tgt_lang = config.get("tgt_lang", "")
+
+    if model_type == "indic2":
+        num_proc = 1
 
     def tokenize(examples):
-        sources = [source_prefix + s for s in examples[source_column]]
+        if processor is not None:
+            sources = processor.preprocess_batch(
+                examples[source_column], src_lang=src_lang, tgt_lang=tgt_lang
+            )
+            raw_targets = processor.preprocess_batch(
+                examples[target_column],
+                src_lang=src_lang,
+                tgt_lang=tgt_lang,
+                is_target=True,
+            )
+        else:
+            sources = [source_prefix + s for s in examples[source_column]]
+            raw_targets = examples[target_column]
+
         inputs = tokenizer(
             sources, max_length=max_src, truncation=True, padding=False
         )
         if model_type == "indic2":
+            tokenizer._switch_to_target_mode()
             targets = tokenizer(
-                examples[target_column],
-                max_length=max_tgt,
-                truncation=True,
-                padding=False,
+                raw_targets, max_length=max_tgt, truncation=True, padding=False
             )
+            tokenizer._switch_to_input_mode()
         else:
             targets = tokenizer(
-                text_target=examples[target_column],
+                text_target=raw_targets,
                 max_length=max_tgt,
                 truncation=True,
                 padding=False,
@@ -180,7 +207,15 @@ def main():
     tokenizer, model = load_tokenizer_and_model(config)
     train_dataset, val_dataset = load_datasets(config, tokenizer)
 
-    data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model, padding=True)
+    if config.get("model_type", "nllb") == "indic2":
+        try:
+            from IndicTransToolkit.collator import IndicDataCollator
+
+            data_collator = IndicDataCollator(tokenizer=tokenizer, model=model, padding=True)
+        except ImportError:
+            data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model, padding=True)
+    else:
+        data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model, padding=True)
 
     output_dir = ROOT / config.get("output_dir", "outputs/models/kathe-model")
     output_dir.mkdir(parents=True, exist_ok=True)

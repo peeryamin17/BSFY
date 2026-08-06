@@ -99,6 +99,17 @@ def _gen_kwargs(config, n_best=1):
     return kwargs
 
 
+def _get_processor(config):
+    if config.get("model_type", "nllb") == "indic2" and config.get("use_indic_processor", False):
+        try:
+            from IndicTransToolkit.processor import IndicProcessor
+
+            return IndicProcessor(inference=True)
+        except ImportError:
+            return None
+    return None
+
+
 @torch.no_grad()
 def generate_predictions(model, tokenizer, texts, config, batch_size=None):
     if batch_size is None:
@@ -107,7 +118,9 @@ def generate_predictions(model, tokenizer, texts, config, batch_size=None):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
     forced_bos = _setup_language(config, tokenizer, model)
-    sources = _prefix_source(texts, config)
+    processor = _get_processor(config)
+    src_lang = config.get("src_lang", "")
+    tgt_lang = config.get("tgt_lang", "")
 
     model.eval()
     all_preds = []
@@ -115,8 +128,12 @@ def generate_predictions(model, tokenizer, texts, config, batch_size=None):
     if forced_bos is not None:
         gen_kwargs["forced_bos_token_id"] = forced_bos
 
-    for i in range(0, len(sources), batch_size):
-        batch = sources[i : i + batch_size]
+    for i in range(0, len(texts), batch_size):
+        raw = texts[i : i + batch_size]
+        if processor is not None:
+            batch = processor.preprocess_batch(raw, src_lang=src_lang, tgt_lang=tgt_lang)
+        else:
+            batch = _prefix_source(raw, config)
         inputs = tokenizer(
             batch,
             max_length=config.get("max_source_length", 128),
@@ -125,7 +142,10 @@ def generate_predictions(model, tokenizer, texts, config, batch_size=None):
             return_tensors="pt",
         ).to(device)
         outputs = model.generate(**inputs, **gen_kwargs)
-        all_preds.extend(tokenizer.batch_decode(outputs, skip_special_tokens=True))
+        preds = tokenizer.batch_decode(outputs, skip_special_tokens=True)
+        if processor is not None:
+            preds = processor.postprocess_batch(preds, lang=tgt_lang)
+        all_preds.extend(preds)
 
     return all_preds
 
@@ -138,7 +158,9 @@ def generate_candidates(model, tokenizer, texts, config, n_best=8, batch_size=No
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
     forced_bos = _setup_language(config, tokenizer, model)
-    sources = _prefix_source(texts, config)
+    processor = _get_processor(config)
+    src_lang = config.get("src_lang", "")
+    tgt_lang = config.get("tgt_lang", "")
 
     model.eval()
     all_candidates = []
@@ -146,8 +168,12 @@ def generate_candidates(model, tokenizer, texts, config, n_best=8, batch_size=No
     if forced_bos is not None:
         gen_kwargs["forced_bos_token_id"] = forced_bos
 
-    for i in range(0, len(sources), batch_size):
-        batch = sources[i : i + batch_size]
+    for i in range(0, len(texts), batch_size):
+        raw = texts[i : i + batch_size]
+        if processor is not None:
+            batch = processor.preprocess_batch(raw, src_lang=src_lang, tgt_lang=tgt_lang)
+        else:
+            batch = _prefix_source(raw, config)
         inputs = tokenizer(
             batch,
             max_length=config.get("max_source_length", 128),
@@ -158,9 +184,15 @@ def generate_candidates(model, tokenizer, texts, config, n_best=8, batch_size=No
         outputs = model.generate(**inputs, **gen_kwargs)
         batch_len = outputs.shape[0] // n_best
         outputs = outputs.view(batch_len, n_best, -1)
-        for row in outputs:
-            cands = tokenizer.batch_decode(row, skip_special_tokens=True)
-            all_candidates.append(cands)
+        rows = [tokenizer.batch_decode(row, skip_special_tokens=True) for row in outputs]
+        if processor is not None:
+            flat = processor.postprocess_batch(
+                [c for row in rows for c in row],
+                lang=tgt_lang,
+                num_return_sequences=n_best,
+            )
+            rows = [flat[j * n_best : (j + 1) * n_best] for j in range(batch_len)]
+        all_candidates.extend(rows)
 
     return all_candidates
 
