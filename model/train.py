@@ -1,6 +1,7 @@
 import os
 
 os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 import argparse
 import random
@@ -255,7 +256,6 @@ def main():
         greater_is_better=True,
         save_strategy="steps",
         report_to=["tensorboard"],
-        n_gpu=1,
         seed=config.get("seed", 42),
     )
 
