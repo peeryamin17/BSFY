@@ -94,8 +94,9 @@ def _gen_kwargs(config, n_best=1):
     kwargs = {
         "max_new_tokens": config.get("max_generate_tokens", 128),
         "num_beams": config.get("num_beams", 8),
-        "length_penalty": config.get("length_penalty", 1.0),
+        "length_penalty": config.get("length_penalty", 0.6),
         "early_stopping": True,
+        "no_repeat_ngram_size": config.get("no_repeat_ngram_size", 3),
     }
     if n_best > 1:
         kwargs["num_return_sequences"] = n_best

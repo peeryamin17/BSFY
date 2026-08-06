@@ -83,6 +83,14 @@ def load_tokenizer_and_model(config):
         if config.get("gradient_checkpointing", False):
             model.get_base_model().enable_input_require_grads()
 
+    gen_model = model.get_base_model() if hasattr(model, "get_base_model") else model
+    gc = gen_model.generation_config
+    gc.early_stopping = True
+    gc.num_beams = config.get("num_beams", 8)
+    gc.length_penalty = config.get("length_penalty", 0.6)
+    gc.no_repeat_ngram_size = config.get("no_repeat_ngram_size", 3)
+    gc.max_new_tokens = config.get("max_generate_tokens", 128)
+
     return tokenizer, model
 
 
