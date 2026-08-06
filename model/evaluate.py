@@ -1,7 +1,6 @@
 import argparse
 
 import pandas as pd
-from sacrebleu import CHRF, BLEU
 
 from inference import (
     ROOT,
@@ -9,25 +8,7 @@ from inference import (
     load_config,
     predict,
 )
-
-
-def compute_metrics(predictions, references):
-    if len(predictions) != len(references):
-        raise ValueError("Predictions and references must have the same length")
-
-    refs = [[ref] for ref in references]
-    chrf = CHRF(word_order=2)
-    bleu = BLEU()
-
-    chrf_score = chrf.corpus_score(predictions, refs).score
-    bleu_score = bleu.corpus_score(predictions, refs).score
-    geo_mean = (chrf_score * bleu_score) ** 0.5
-
-    return {
-        "chrF++": round(chrf_score, 2),
-        "BLEU": round(bleu_score, 2),
-        "geo_mean": round(geo_mean, 2),
-    }
+from metrics import compute_all
 
 
 def main():
@@ -56,10 +37,11 @@ def main():
 
     predictions = predict(texts, config, checkpoints)
 
-    metrics = compute_metrics(predictions, references)
-    print(f"\nchrF++   : {metrics['chrF++']}")
-    print(f"BLEU     : {metrics['BLEU']}")
-    print(f"geo_mean : {metrics['geo_mean']}")
+    metrics = compute_all(predictions, references)
+    print("\n========== EVALUATION ==========")
+    for key, value in metrics.items():
+        print(f"{key:<12}: {value}")
+    print("================================")
 
     out_path = ROOT / args.out
     out_path.parent.mkdir(parents=True, exist_ok=True)

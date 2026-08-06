@@ -18,7 +18,7 @@ def _torch_load(*args, **kwargs):
     return _orig_torch_load(*args, **kwargs)
 torch.load = _torch_load
 from datasets import Dataset, load_from_disk
-from sacrebleu import CHRF, BLEU
+from metrics import compute_all
 from transformers import (
     AutoModelForSeq2SeqLM,
     AutoTokenizer,
@@ -198,19 +198,7 @@ def compute_metrics(tokenizer):
         label_ids = np.where(label_ids != -100, label_ids, tokenizer.pad_token_id)
         predictions = tokenizer.batch_decode(pred_ids, skip_special_tokens=True)
         references = tokenizer.batch_decode(label_ids, skip_special_tokens=True)
-        references = [[ref] for ref in references]
-
-        chrf = CHRF(word_order=2)
-        bleu = BLEU()
-        chrf_score = chrf.corpus_score(predictions, references).score
-        bleu_score = bleu.corpus_score(predictions, references).score
-        geo_mean = (chrf_score * bleu_score) ** 0.5
-
-        return {
-            "chrF++": round(chrf_score, 2),
-            "BLEU": round(bleu_score, 2),
-            "geo_mean": round(geo_mean, 2),
-        }
+        return compute_all(predictions, references)
 
     return _compute
 
