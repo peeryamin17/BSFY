@@ -8,6 +8,11 @@ import yaml
 from sacrebleu import CHRF, BLEU
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
+try:
+    from orthography import normalize
+except ImportError:
+    from model.orthography import normalize
+
 ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -229,22 +234,26 @@ def predict(texts, config, checkpoints, batch_size=None):
             else:
                 checkpoint = checkpoints[0]
         model, tokenizer = load_model_and_tokenizer(config, checkpoint)
-        return generate_predictions(model, tokenizer, texts, config, batch_size)
+        results = generate_predictions(model, tokenizer, texts, config, batch_size)
+    else:
+        checkpoints = checkpoints or [None]
+        max_ckpts = config.get("mbr_max_checkpoints", 0)
+        if max_ckpts and len(checkpoints) > max_ckpts:
+            checkpoints = checkpoints[-max_ckpts:]
 
-    checkpoints = checkpoints or [None]
+        n_best = config.get("mbr_n_best", 8)
+        pooled = [[] for _ in texts]
+        for ckpt in checkpoints:
+            model, tokenizer = load_model_and_tokenizer(config, ckpt)
+            candidates = generate_candidates(model, tokenizer, texts, config, n_best, batch_size)
+            for i, cands in enumerate(candidates):
+                pooled[i].extend(cands)
+            del model, tokenizer
+            torch.cuda.empty_cache()
 
-    n_best = config.get("mbr_n_best", 8)
-    pooled = [[] for _ in texts]
-    for ckpt in checkpoints:
-        model, tokenizer = load_model_and_tokenizer(config, ckpt)
-        candidates = generate_candidates(model, tokenizer, texts, config, n_best, batch_size)
-        for i, cands in enumerate(candidates):
-            pooled[i].extend(cands)
-        del model, tokenizer
-        torch.cuda.empty_cache()
-
-    metric = config.get("mbr_metric", "chrf")
-    return [mbr_rerank(cands, metric) for cands in pooled]
+        metric = config.get("mbr_metric", "chrf")
+        results = [mbr_rerank(cands, metric) for cands in pooled]
+    return [normalize(p) for p in results]
 
 
 def translate(texts, checkpoint=None, config_path=None):

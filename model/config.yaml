@@ -54,3 +54,4 @@ batch_size: 16
 mbr: false
 mbr_n_best: 8
 mbr_metric: "chrf"
+mbr_max_checkpoints: 3
