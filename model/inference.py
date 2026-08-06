@@ -20,15 +20,18 @@ def _load_base(config):
     model_type = config.get("model_type", "nllb")
     model_name = config["model_name"]
     tgt_lang = config.get("tgt_lang", "")
+    model_kwargs = {"attn_implementation": config.get("attn_implementation")}
 
     if model_type in ("nllb", "mbart"):
         tokenizer = AutoTokenizer.from_pretrained(model_name, tgt_lang=tgt_lang)
-        model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+        model = AutoModelForSeq2SeqLM.from_pretrained(model_name, **model_kwargs)
         if tgt_lang:
             model.config.forced_bos_token_id = tokenizer.convert_tokens_to_ids(tgt_lang)
     elif model_type == "indic2":
         tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
-        model = AutoModelForSeq2SeqLM.from_pretrained(model_name, trust_remote_code=True)
+        model = AutoModelForSeq2SeqLM.from_pretrained(
+            model_name, trust_remote_code=True, **model_kwargs
+        )
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token or tokenizer.unk_token
     else:
