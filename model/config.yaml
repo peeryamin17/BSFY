@@ -1,0 +1,72 @@
+# KATHE 2026 - Fine-tuning configuration
+# Used by: model/train.py, model/evaluate.py, model/inference.py
+
+# ---------------------------------------------------------------------------
+# Model
+# ---------------------------------------------------------------------------
+# One of:
+#   - "facebook/nllb-200-distilled-600M"  (default, reliable on 8GB GPUs)
+#   - "facebook/nllb-200-distilled-1.3B"  (better quality, needs more VRAM)
+#   - "ai4bharat/IndicTrans2-en-indic-1B" (best Kashmiri coverage, 1B params)
+#   - "facebook/mbart-large-50-many-to-many-mmt"
+model_name: "facebook/nllb-200-distilled-600M"
+
+# nllb | mbart | indic2
+model_type: "nllb"
+
+# Language codes used by NLLB / mBART style tokenizers.
+# For IndicTrans2 these fields are ignored (see source_prefix below).
+src_lang: "eng_Latn"
+tgt_lang: "kas_Arab"
+
+# IndicTrans2 only: tag prepended to the English source that tells the model
+# which language to translate into. Set to "" for NLLB/mBART.
+source_prefix: ""
+
+# Where fine-tuned weights are written / read from (relative to repo root).
+output_dir: "outputs/models/nllb-baseline"
+
+# ---------------------------------------------------------------------------
+# Data (paths relative to repo root)
+# ---------------------------------------------------------------------------
+data_dir: "data"
+train_file: "data/train.csv"
+val_file: "data/val.csv"
+test_file: "data/test.csv"
+
+# Column names expected in the CSVs produced by data/train_val_split.py
+source_column: "english_text"
+target_column: "kashmiri_text"
+
+# ---------------------------------------------------------------------------
+# Preprocessing
+# ---------------------------------------------------------------------------
+max_source_length: 128
+max_target_length: 128
+truncation: true
+
+# ---------------------------------------------------------------------------
+# Training
+# ---------------------------------------------------------------------------
+per_device_train_batch_size: 8
+per_device_eval_batch_size: 8
+gradient_accumulation_steps: 1
+learning_rate: 3e-5
+warmup_steps: 500
+num_train_epochs: 3
+weight_decay: 0.01
+logging_steps: 100
+eval_steps: 500
+save_steps: 500
+save_total_limit: 3
+fp16: true
+predict_with_generate: true
+seed: 42
+
+# ---------------------------------------------------------------------------
+# Generation (inference / evaluation)
+# ---------------------------------------------------------------------------
+num_beams: 4
+length_penalty: 0.6
+max_generate_tokens: 128
+batch_size: 32
