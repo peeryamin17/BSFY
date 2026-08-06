@@ -213,15 +213,7 @@ def main():
     tokenizer, model = load_tokenizer_and_model(config)
     train_dataset, val_dataset = load_datasets(config, tokenizer)
 
-    if config.get("model_type", "nllb") == "indic2":
-        try:
-            from IndicTransToolkit.collator import IndicDataCollator
-
-            data_collator = IndicDataCollator(tokenizer=tokenizer, model=model, padding=True)
-        except ImportError:
-            data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model, padding=True)
-    else:
-        data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model, padding=True)
+    data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model, padding=True)
 
     output_dir = ROOT / config.get("output_dir", "outputs/models/kathe-model")
     output_dir.mkdir(parents=True, exist_ok=True)
