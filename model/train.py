@@ -284,12 +284,53 @@ def main():
     )
 
     resume_from = args.resume or latest_checkpoint(output_dir)
-    trainer.train(resume_from_checkpoint=resume_from)
+    trainer.train(resume_from_checkpoint=resume_from, callbacks=_backup_callbacks(config, output_dir))
     trainer.save_model(str(output_dir))
     tokenizer.save_pretrained(str(output_dir))
 
     with open(output_dir / "config_used.yaml", "w", encoding="utf-8") as f:
         yaml.safe_dump(config, f)
+
+    _push_to_hub(output_dir, config, final=True)
+
+
+def _backup_callbacks(config, output_dir):
+    repo_id = config.get("backup_hf_repo")
+    if not repo_id:
+        return []
+    from transformers import TrainerCallback
+
+    class _Backup(TrainerCallback):
+        def on_save(self, args, state, control, **kwargs):
+            step = state.global_step
+            try:
+                _push_to_hub(output_dir / f"checkpoint-{step}", config)
+            except Exception as e:
+                print(f"[backup] step {step} upload failed: {e}")
+
+    return [_Backup()]
+
+
+def _push_to_hub(path, config, final=False):
+    repo_id = config.get("backup_hf_repo")
+    if not repo_id:
+        return
+    from huggingface_hub import HfApi
+
+    api = HfApi()
+    try:
+        api.create_repo(repo_id=repo_id, repo_type="model", exist_ok=True)
+    except Exception as e:
+        print(f"[backup] create_repo skipped: {e}")
+    kind = "final" if final else "step"
+    api.upload_folder(
+        repo_id=repo_id,
+        repo_type="model",
+        folder_path=str(path),
+        commit_message=f"backup {kind}",
+        ignore_patterns=["*.pt", "rng_state.pth", "scheduler.pt", "optimizer.pt"],
+    )
+    print(f"[backup] uploaded {kind} to HF repo {repo_id}")
 
 
 if __name__ == "__main__":
