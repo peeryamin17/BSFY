@@ -6,23 +6,22 @@ from sklearn.model_selection import train_test_split
 
 ROOT = Path(__file__).resolve().parent.parent
 
-HEADER_FIELDS = {"en", "kas_arab"}
-
 
 def load_parallel_tsv(path):
-    rows = []
-    with open(path, encoding="utf-8") as f:
-        for line_no, line in enumerate(f):
-            parts = line.rstrip("\n").split("\t")
-            if len(parts) < 2:
-                continue
-            en, ks = parts[0].strip(), parts[1].strip()
-            if line_no == 0 and (en.lower() in HEADER_FIELDS or ks.lower() in HEADER_FIELDS):
-                continue
-            if en and ks:
-                rows.append((en, ks))
+    df = pd.read_csv(path, sep="\t", encoding="utf-8")
+    columns = df.columns.tolist()
 
-    df = pd.DataFrame(rows, columns=["english_text", "kashmiri_text"])
+    if "src" in columns and "tgt" in columns:
+        df = df[["src", "tgt"]].rename(
+            columns={"src": "english_text", "tgt": "kashmiri_text"}
+        )
+    else:
+        df = df.iloc[:, [1, 0]].copy()
+        df.columns = ["english_text", "kashmiri_text"]
+
+    df["english_text"] = df["english_text"].astype(str).str.strip()
+    df["kashmiri_text"] = df["kashmiri_text"].astype(str).str.strip()
+    df = df[df["english_text"].ne("") & df["kashmiri_text"].ne("")]
     df.drop_duplicates(subset=["english_text"], keep="first", inplace=True)
     df.reset_index(drop=True, inplace=True)
     return df
