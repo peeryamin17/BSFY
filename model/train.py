@@ -175,9 +175,6 @@ def load_datasets(config, tokenizer):
         return {"input_ids": input_ids, "attention_mask": attention, "labels": labels}
 
     def build(csv_path, cache_path):
-        if cache_path.exists():
-            print(f"Loading tokenized dataset from {cache_path}")
-            return load_from_disk(str(cache_path))
         df = pd.read_csv(ROOT / csv_path)
         sample = " ".join(df[target_column].astype(str).head(500))
         arabic = sum(1 for c in sample if "\u0600" <= c <= "\u06ff" or "\u0750" <= c <= "\u077f")
@@ -188,6 +185,9 @@ def load_datasets(config, tokenizer):
                 f"Data check failed: kashmiri_text is only {ratio:.2f} Arabic script. "
                 "Run data/train_val_split.py to fix the column order."
             )
+        if cache_path.exists():
+            print(f"Loading tokenized dataset from {cache_path} (kashmiri Arabic {ratio:.2f})")
+            return load_from_disk(str(cache_path))
         print(f"Loaded {len(df):,} pairs from {csv_path} (kashmiri Arabic {ratio:.2f})")
         dataset = Dataset.from_dict(tokenize_df(df))
         dataset.save_to_disk(str(cache_path))
