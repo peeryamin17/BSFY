@@ -1,5 +1,6 @@
 import argparse
 import json
+import unicodedata
 from collections import Counter
 from pathlib import Path
 
@@ -26,7 +27,7 @@ def main():
     args = parser.parse_args()
 
     df = pd.read_csv(ROOT / args.input)
-    text = "".join(df[args.column].astype(str).tolist())
+    text = unicodedata.normalize("NFC", "".join(df[args.column].astype(str).tolist()))
     counts = Counter(text)
     total = len(text)
 
@@ -46,7 +47,7 @@ def main():
             if ch == main_char:
                 continue
             if present[main_char] / group_total >= DOMINANCE_THRESHOLD:
-                char_map[ch] = main_char
+                char_map[unicodedata.normalize("NFC", ch)] = unicodedata.normalize("NFC", main_char)
                 print(
                     f"  map {ch!r} (U+{ord(ch):04X}) -> {main_char!r} (U+{ord(main_char):04X})"
                     f"  [{n} vs {present[main_char]}]"

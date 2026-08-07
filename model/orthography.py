@@ -1,5 +1,6 @@
 import json
 import re
+import unicodedata
 from functools import lru_cache
 from pathlib import Path
 
@@ -17,11 +18,13 @@ def _load():
 def normalize(text, config=None):
     if config is None:
         config = _load()
+    text = unicodedata.normalize("NFC", text)
     char_map = config.get("char_map") or {}
     if char_map:
         text = "".join(char_map.get(ch, ch) for ch in text)
+        text = unicodedata.normalize("NFC", text)
     for rule in config.get("suffixes") or []:
-        suffix = rule.get("suffix", "")
+        suffix = unicodedata.normalize("NFC", rule.get("suffix", ""))
         if not suffix:
             continue
         if rule.get("attach"):

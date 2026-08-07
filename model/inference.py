@@ -213,6 +213,19 @@ def generate_candidates(model, tokenizer, texts, config, n_best=8, batch_size=No
     return all_candidates
 
 
+def _rerank_all(pooled, metric):
+    try:
+        import os
+        from concurrent.futures import ProcessPoolExecutor
+        from functools import partial
+
+        num_workers = min(os.cpu_count() or 2, 4)
+        with ProcessPoolExecutor(max_workers=num_workers) as executor:
+            return list(executor.map(partial(mbr_rerank, metric=metric), pooled, chunksize=16))
+    except Exception:
+        return [mbr_rerank(cands, metric) for cands in pooled]
+
+
 def mbr_rerank(candidates, metric="geo"):
     candidates = list(dict.fromkeys(candidates))
     if len(candidates) < 2:
@@ -238,13 +251,14 @@ def mbr_rerank(candidates, metric="geo"):
 
 def predict(texts, config, checkpoints, batch_size=None):
     if not config.get("mbr", False):
-        checkpoint = None
-        if checkpoints:
+        if not checkpoints:
+            checkpoint = None
+        elif len(checkpoints) > 1:
             root = Path(checkpoints[0]).parent
-            if (root / "adapter_config.json").exists():
-                checkpoint = str(root)
-            else:
-                checkpoint = checkpoints[0]
+            completed = (root / "adapter_config.json").exists() and (root / "config_used.yaml").exists()
+            checkpoint = str(root) if completed else checkpoints[-1]
+        else:
+            checkpoint = checkpoints[0]
         model, tokenizer = load_model_and_tokenizer(config, checkpoint)
         results = generate_predictions(model, tokenizer, texts, config, batch_size)
     else:
@@ -265,7 +279,7 @@ def predict(texts, config, checkpoints, batch_size=None):
 
         pooled = [[normalize(c) for c in cands] for cands in pooled]
         metric = config.get("mbr_metric", "chrf")
-        results = [mbr_rerank(cands, metric) for cands in pooled]
+        results = _rerank_all(pooled, metric)
     return [normalize(p) for p in results]
 
 
