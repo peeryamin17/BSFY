@@ -22,7 +22,7 @@ gradient_accumulation_steps: 8
 attn_implementation: "sdpa"
 learning_rate: 0.0002
 warmup_steps: 500
-num_train_epochs: 2
+num_train_epochs: 1
 weight_decay: 0.01
 logging_steps: 100
 eval_steps: 1000
