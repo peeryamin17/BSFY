@@ -1,10 +1,33 @@
 import argparse
+import re
 from pathlib import Path
 
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
 ROOT = Path(__file__).resolve().parent.parent
+
+_LATIN_RE = re.compile(r"[A-Za-z]")
+_ARABIC_RE = re.compile(r"[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]")
+
+
+def _script_ratio(texts, pattern):
+    joined = " ".join(texts)
+    chars = [c for c in joined if not c.isspace()]
+    if not chars:
+        return 0.0
+    return len(pattern.findall(joined)) / len(chars)
+
+
+def check_columns(df):
+    en_ratio = _script_ratio(df["english_text"].head(1000), _LATIN_RE)
+    ks_ratio = _script_ratio(df["kashmiri_text"].head(1000), _ARABIC_RE)
+    print(f"Sanity check -> english Latin:{en_ratio:.2f}  kashmiri Arabic:{ks_ratio:.2f}")
+    if en_ratio < 0.5 or ks_ratio < 0.2:
+        raise SystemExit(
+            "Columns look swapped: english_text is not mostly Latin and/or "
+            "kashmiri_text is not mostly Arabic script. Check the TSV column order."
+        )
 
 
 def load_parallel_tsv(path):
@@ -45,6 +68,7 @@ def main():
 
     df = load_parallel_tsv(in_path)
     print(f"Loaded {len(df):,} parallel sentence pairs from {in_path}")
+    check_columns(df)
 
     train, test = train_test_split(df, test_size=args.test_size, random_state=args.seed)
     val_size_rel = args.val_size / (1 - args.test_size)
