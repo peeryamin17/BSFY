@@ -74,6 +74,16 @@ def main():
     val_size_rel = args.val_size / (1 - args.test_size)
     train, val = train_test_split(train, test_size=val_size_rel, random_state=args.seed)
 
+    train_ids = set(train["english_text"])
+    val_ids = set(val["english_text"])
+    test_ids = set(test["english_text"])
+    overlap_tv = len(train_ids & val_ids)
+    overlap_tt = len(train_ids & test_ids)
+    overlap_vt = len(val_ids & test_ids)
+    print(f"Overlap check -> train∩val: {overlap_tv}  train∩test: {overlap_tt}  val∩test: {overlap_vt}")
+    if overlap_tv or overlap_tt or overlap_vt:
+        raise SystemExit("Overlap detected between splits. Refusing to write leaked data.")
+
     out_dir = ROOT / "data"
     out_dir.mkdir(exist_ok=True)
     for name, split_df in {"train": train, "val": val, "test": test}.items():

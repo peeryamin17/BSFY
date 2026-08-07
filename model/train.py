@@ -197,7 +197,8 @@ def load_datasets(config, tokenizer):
     val_dataset = build(config["val_file"], cache_dir / "val")
     val_max = config.get("eval_max_samples", 0)
     if val_max and len(val_dataset) > val_max:
-        val_dataset = val_dataset.select(range(val_max))
+        rng = random.Random(config.get("seed", 42))
+        val_dataset = val_dataset.select(rng.sample(range(len(val_dataset)), val_max))
     return train_dataset, val_dataset
 
 
