@@ -282,10 +282,11 @@ def main():
         data_collator=data_collator,
         tokenizer=tokenizer,
         compute_metrics=compute_metrics(tokenizer),
+        callbacks=_backup_callbacks(config, output_dir),
     )
 
     resume_from = args.resume or latest_checkpoint(output_dir)
-    trainer.train(resume_from_checkpoint=resume_from, callbacks=_backup_callbacks(config, output_dir))
+    trainer.train(resume_from_checkpoint=resume_from)
     trainer.save_model(str(output_dir))
     tokenizer.save_pretrained(str(output_dir))
 
