@@ -295,6 +295,7 @@ def main():
     parser.add_argument("--config", default=str(ROOT / "model" / "config.yaml"))
     parser.add_argument("--test", default="data/test.csv")
     parser.add_argument("--out", default="outputs/submission.csv")
+    parser.add_argument("--source-column", default=None)
     parser.add_argument("--mbr", dest="mbr", action="store_true")
     parser.add_argument("--no-mbr", dest="mbr", action="store_false")
     parser.add_argument("--mbr-metric", default=None, choices=["chrf", "bleu", "geo"])
@@ -306,7 +307,9 @@ def main():
     if args.mbr_metric:
         config["mbr_metric"] = args.mbr_metric
     test_df = pd.read_csv(ROOT / args.test)
-    source_column = config.get("source_column", "english_text")
+    source_column = args.source_column or config.get("source_column", "english_text")
+    if source_column not in test_df.columns:
+        source_column = test_df.columns[1]
 
     id_col = test_df.columns[0]
     texts = test_df[source_column].astype(str).tolist()
