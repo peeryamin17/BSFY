@@ -14,6 +14,7 @@ def main():
     parser.add_argument("--length-penalty", type=float, default=None)
     parser.add_argument("--no-repeat-ngram-size", type=int, default=None)
     parser.add_argument("--max-new-tokens", type=int, default=None)
+    parser.add_argument("--batch-size", type=int, default=None)
     parser.add_argument("--out", default=OUT_CSV)
     args = parser.parse_args()
 
@@ -26,11 +27,13 @@ def main():
         config["no_repeat_ngram_size"] = args.no_repeat_ngram_size
     if args.max_new_tokens is not None:
         config["max_generate_tokens"] = args.max_new_tokens
+    if args.batch_size is not None:
+        config["batch_size"] = args.batch_size
 
     df = pd.read_csv(DEV_CSV)
     texts = df["sentence"].astype(str).tolist()
     checkpoints = collect_checkpoints("outputs/models/indic2-final")
-    predictions = predict(texts, config, checkpoints)
+    predictions = predict(texts, config, checkpoints, batch_size=config.get("batch_size"))
     out = pd.DataFrame({"ID": df["ID"], "kashmiri_text": predictions})
     out.to_csv(args.out, index=False)
     print(f"DONE: {len(out)} predictions saved to {args.out}")
