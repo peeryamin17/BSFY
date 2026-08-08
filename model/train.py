@@ -262,6 +262,10 @@ def main():
         predict_with_generate=config.get("predict_with_generate", True),
         fp16=config.get("fp16", True) and torch.cuda.is_available(),
         gradient_checkpointing=config.get("gradient_checkpointing", False),
+        gradient_checkpointing_kwargs=(
+            {"use_reentrant": False} if config.get("gradient_checkpointing", False) else None
+        ),
+        ddp_find_unused_parameters=False,
         optim=config.get("optim", "adamw_torch"),
         dataloader_num_workers=config.get("dataloader_num_workers", 2),
         torch_compile=config.get("torch_compile", False),
