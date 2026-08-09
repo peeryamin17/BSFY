@@ -299,7 +299,10 @@ def main():
     with open(output_dir / "config_used.yaml", "w", encoding="utf-8") as f:
         yaml.safe_dump(config, f)
 
-    _push_to_hub(output_dir, config, final=True)
+    try:
+        _push_to_hub(output_dir, config, final=True)
+    except Exception as e:
+        print(f"[backup] final upload failed (non-fatal): {e}")
 
 
 def _backup_callbacks(config, output_dir):
