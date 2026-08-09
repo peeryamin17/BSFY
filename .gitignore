@@ -9,3 +9,4 @@ venv/
 outputs/models/
 outputs/predictions/
 data/raw/
+outputs/variants/

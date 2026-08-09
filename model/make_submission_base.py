@@ -16,9 +16,10 @@ def main():
     parser.add_argument("--max-new-tokens", type=int, default=None)
     parser.add_argument("--batch-size", type=int, default=None)
     parser.add_argument("--out", default=OUT_CSV)
+    parser.add_argument("--config", default="model/config.yaml")
     args = parser.parse_args()
 
-    config = load_config("model/config.yaml")
+    config = load_config(args.config)
     if args.num_beams is not None:
         config["num_beams"] = args.num_beams
     if args.length_penalty is not None:
