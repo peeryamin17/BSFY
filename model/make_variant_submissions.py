@@ -36,8 +36,17 @@ VARIANTS = {
         "ا": "ا", "آ": "ا", "أ": "ا", "إ": "ا", "ٲ": "ا",
         "ك": "ک", "ک": "ک", "ڪ": "ک",
     },
+    # Target 4: "Arabic with Kashmiri Vowels" — maps consonants to standard Arabic
+    # but preserves the distinct Kashmiri vowels (ۄ, ٲ).
+    "arabic_with_kvowels": {
+        "ی": "ي", "ے": "ي", "ي": "ي", "ې": "ي", "ێ": "ي",
+        "و": "و", "ۄ": "ۄ", "ۆ": "و", "ۏ": "و",
+        "ه": "ه", "ھ": "ه", "ۂ": "ه", "ة": "ه", "ہ": "ه",
+        "ن": "ن", "ں": "ن",
+        "ا": "ا", "آ": "آ", "أ": "ا", "إ": "ا", "ٲ": "ٲ",
+        "ك": "ك", "ک": "ك", "ڪ": "ك",
+    },
 }
-
 
 def apply(text, char_map):
     text = unicodedata.normalize("NFC", text)
@@ -48,7 +57,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True, help="CSV with ID,kashmiri_text")
     parser.add_argument("--outdir", default="outputs/variants")
-    parser.add_argument("--variants", nargs="+", default=["kashmiri", "arabic", "perso"])
+    parser.add_argument("--variants", nargs="+", default=["kashmiri", "arabic", "perso", "arabic_with_kvowels"])
     args = parser.parse_args()
 
     outdir = Path(args.outdir)
