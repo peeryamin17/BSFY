@@ -1,0 +1,30 @@
+model_name: "ai4bharat/indictrans2-en-indic-1B"
+model_type: "indic2"
+src_lang: "eng_Latn"
+tgt_lang: "kas_Deva"
+source_prefix: "eng_Latn kas_Deva "
+use_indic_processor: true
+output_dir: "outputs/models/indic2-deva"
+
+data_dir: "data"
+train_file: "data/train.csv"
+val_file: "data/val.csv"
+test_file: "data/test.csv"
+source_column: "english_text"
+target_column: "kashmiri_text"
+
+max_source_length: 128
+max_target_length: 128
+
+attn_implementation: "sdpa"
+num_beams: 8
+length_penalty: 0.6
+no_repeat_ngram_size: 3
+max_generate_tokens: 128
+batch_size: 16
+mbr: false
+mbr_n_best: 8
+mbr_metric: "geo"
+mbr_max_checkpoints: 3
+top_p: 0.9
+temperature: 0.7

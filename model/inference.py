@@ -48,14 +48,13 @@ def load_model_and_tokenizer(config, checkpoint=None):
     if checkpoint and (Path(checkpoint) / "adapter_config.json").exists():
         from peft import PeftModel
 
-        tokenizer = AutoTokenizer.from_pretrained(checkpoint)
-        base_model, _ = _load_base(config)
+        base_model, tokenizer = _load_base(config)
         model = PeftModel.from_pretrained(base_model, checkpoint)
         if config.get("merge_lora", True):
             model = model.merge_and_unload()
     elif checkpoint and (Path(checkpoint) / "config.json").exists():
-        tokenizer = AutoTokenizer.from_pretrained(checkpoint)
-        model = AutoModelForSeq2SeqLM.from_pretrained(checkpoint)
+        _, tokenizer = _load_base(config)
+        model = AutoModelForSeq2SeqLM.from_pretrained(checkpoint, trust_remote_code=True)
     else:
         model, tokenizer = _load_base(config)
     return model, tokenizer
