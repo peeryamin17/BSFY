@@ -55,9 +55,12 @@ def load_tokenizer_and_model(config):
         if tgt_lang:
             model.config.forced_bos_token_id = tokenizer.convert_tokens_to_ids(tgt_lang)
     elif model_type == "indic2":
-        tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+        hf_token = os.environ.get("HF_TOKEN")
+        tokenizer = AutoTokenizer.from_pretrained(
+            model_name, trust_remote_code=True, token=hf_token
+        )
         model = AutoModelForSeq2SeqLM.from_pretrained(
-            model_name, trust_remote_code=True, **model_kwargs
+            model_name, trust_remote_code=True, token=hf_token, **model_kwargs
         )
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token or tokenizer.unk_token
