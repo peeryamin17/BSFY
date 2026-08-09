@@ -63,6 +63,9 @@ def main():
         cfg["save_steps"] = 300
         cfg["save_total_limit"] = 2
         cfg["warmup_steps"] = 60
+        # Disable HF backup uploads during the sweep (read-only token in secrets,
+        # and we don't need remote checkpoints for a hyperparameter comparison).
+        cfg["backup_hf_repo"] = ""
         name = f"trial_{i}"
         cfg_path = sweep_dir / f"{name}.yaml"
         yaml.safe_dump(cfg, open(cfg_path, "w", encoding="utf-8"))
