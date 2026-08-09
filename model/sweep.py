@@ -1,5 +1,6 @@
 import argparse
 import itertools
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -28,13 +29,8 @@ def run(cmd, timeout=None):
 def parse_geo(out):
     if not out:
         return None
-    for line in out.splitlines():
-        if "geo_mean" in line and "eval_geo_mean" in line:
-            try:
-                return float(line.split("eval_geo_mean")[1].split(":")[1].strip().rstrip(","))
-            except Exception:
-                continue
-    return None
+    m = re.search(r"'eval_geo_mean':\s*([\d.]+)", out)
+    return float(m.group(1)) if m else None
 
 
 def main():
