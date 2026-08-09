@@ -1,6 +1,7 @@
 import argparse
 import itertools
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -51,7 +52,11 @@ def main():
     for i, over in enumerate(trials):
         cfg = dict(base)
         cfg.update(over)
-        cfg["output_dir"] = str(ROOT / f"outputs/models/tune-{i}")
+        out_dir = ROOT / f"outputs/models/tune-{i}"
+        if out_dir.exists():
+            print(f"[sweep] removing stale trial dir {out_dir}")
+            shutil.rmtree(out_dir)
+        cfg["output_dir"] = str(out_dir)
         cfg["num_train_epochs"] = 1
         cfg["label_smoothing_factor"] = 0.1
         cfg["lr_scheduler_type"] = "cosine"
